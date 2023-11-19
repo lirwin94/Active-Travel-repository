@@ -1,0 +1,210 @@
+---
+title: "Active_travel"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-11-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Aim
+The aim of this project is to review active travel to work across Scottish council areas in the year 2019. First, we will explore the active travel to work average for each individual Scottish council. This will be plotted on a bar chart. From the data, we will establish the average for all of Scotland and overlay this information on the bar chart to understand how each council area compares to the Scottish average. 
+
+The second part of this project will explore active travel to work based off population density. This will be illustrated by varying the widths of bars within a bar chart to represent the population of the given council area. 
+
+
+## Install Packages
+
+```{r}
+install.packages("forcats")
+install.packages("tinytex")
+```
+
+##Load packages
+
+The below packages will be used in order to read, explore, clenase and display the data.
+```{r load packages}
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(viridis)
+library(patchwork)
+library(plotly)
+library(forcats)
+library(tinytex)
+
+```
+
+##Read in active travel data
+The data is in the file 'active_travel_data_extract.csv'. It contains data collected from a Scottish Household survey that explores active travel to work in each council area, health board and intermediate zone within Scotland in 2019. The data contains the average active travel to work for each area in the data set. It was downloaded from https://scotland.shinyapps.io/ScotPHO_profiles_tool/ Within the tool, it was filtered by year to only include data from 2019. 
+
+The data will be read in and explored to establish what variables are required for this project.
+
+```{r read active travel data}
+active_travel_data_extract <- read_csv("active_travel_data_extract.csv")
+
+```
+
+#Review the data
+Explore the data to identify what is required for this project.
+
+```{r review the data}
+glimpse(active_travel_data)
+```
+#Select relevant variables
+Area_name, area_code, area_type and measure will be required for this review. In order to explore the active travel to work average for each council area in Scotland. 
+
+```{r select_relevant_variables}
+active_travel_data <-active_travel_data_extract %>% 
+  select('area_name','area_code','area_type','measure') %>% 
+rename(active_average = 'measure')
+head(active_travel_data)
+
+```
+
+
+#Review area data
+This project is only reviewing data from Council areas. Therefore we must review the data to understand what areas exist in the data and in order to extrapliate council areas only. 
+```{r review area types}
+active_travel_data$area_type %>% 
+  unique()
+```
+# Select Council area data only
+The data contains both health board and council area data. We are only concerned with council area data in this project, therefore Health board data will be removed. 
+```{r extract council area data}
+council_active_travel <- active_travel_data %>% 
+  filter(area_type == "Council area")
+head(council_active_travel)
+```
+#Refine data further
+On further review, only the area_name and active_average figures is required for this review. Therefore all other data will be removed from this dataset.
+
+```{r select only area name and active average}
+active_average_by_area <- council_active_travel %>% 
+  select("area_name","active_average")
+glimpse(active_average_by_area)
+```
+##Calculate the average for Scotland
+The average for Scotland based off Scottish Council areas will also be displayed to understand how each council area performs relative to the average. From the data we will establish the Scottish average based off the active_average data. This will be added to the data set as a new variable
+
+```{r establish the average for Scotland based off Scottish Council areas}
+mean_active_travel <- active_average_by_area %>% 
+  group_by(active_average) %>% 
+  mutate(Scottish_Average= mean(active_average_by_area$active_average))
+
+head(mean_active_travel)
+```
+
+##Plot data
+A bar chart will be used to plot and display the active travel to work average per Scottish Council area in 2019. ggplot will be used for the purpose of plotting this display. A line will be plotted over the bar chart to display the overall average for active travel to work in Scottish council areas. 
+
+```{r ggplot blank canvas}
+mean_active_travel %>% 
+  ggplot()
+
+```
+
+#Plot active travel by council area in Scotland using a bar chart 
+The data will be displayed using a bar chart. To represent the average active travel for Scottish councils in 2019, a line will be plotted across the bar chart.
+Colour will be used to illustrate councils who achieve rates of above average active travel to work rates, and to highlight councils that have below average active travel to work rates in 2019. 
+
+```{r highlight councils that sit above and below the mean using colour, fig.width=27}
+mean_active_travel %>% 
+  mutate(Relative_to_Scottish_average=ifelse(active_average > Scottish_Average,"Above","Below")) %>% 
+  ggplot(aes(x = reorder(str_wrap(area_name, 10),active_average), y = active_average, fill = Relative_to_Scottish_average, alpha=0))+
+  geom_col()+
+    geom_line(aes(y = Scottish_Average),size = 3, color="orange", group = 4)+
+  geom_text(aes(label = active_average, y = active_average, vjust = 0.1)) +
+  scale_fill_viridis(discrete = TRUE, direction = -1)+
+  scale_alpha(guide = 'none')+
+  theme_bw()+
+   xlab(NULL)+
+  ylab("Council area active travel to work average for 2019")+
+  ggtitle("Active travel to work average by Scottish council area in 2019")+
+   theme(axis.text.x = element_text(size = 8),  
+        axis.text.y = element_text(size = 12),  
+        axis.title = element_text(size = 18),   
+        plot.title = element_text(size = 20))
+
+  
+```
+
+##Explore active travel and population density by council areas in Scotland 
+Active travel by council area will now be reviewed relative to the population density of that council area. To do this, data was taken from https://scotland.shinyapps.io/ScotPHO_profiles_tool/ that contains Mid-year population estimates for 18+years.
+
+#Read in population data
+```{r read in population data}
+population_data <- read_csv("18+_population_data_extract.csv")
+glimpse(population_data)
+```
+#Review the data
+The data will be reviewed to establish what aspects are required for this project and to ensure this data is only from 2019
+```{r confirm this only contains data for 2019}
+population_data$year %>% 
+  unique()
+```
+
+##Select the relevant data
+area_name, area_type and numerator are the variables required for this review. The data will be further refined to select council areas only. Area_name will be the key to join the the dataset with the actice travel to work data. The population variable will be used to review the council area active travel to work average relative to population size. 
+
+```{r select relevant variables}
+population_density <- population_data %>% 
+  select(area_name, area_type, numerator) %>% 
+rename(population = "numerator")
+head(population_density)
+
+```
+
+## Filter the data
+For the purpose of this project, we are only reviewing Scottish council data. Therefore we will be filtering to Scottish council data only
+
+```{r filter by council area}
+council_population <- population_density %>% 
+  filter(area_type == "Council area") %>% 
+  select(area_name, population)
+head(council_population)
+
+
+```
+
+##Join active travel data set and population density data set
+Both datasets will be joined using the area_name as a key to include the population data in the active travel data set. 
+
+```{r joining datasets}
+joint_data <- left_join(mean_active_travel, council_population, by = "area_name")
+
+head(joint_data)
+```
+       
+##Plot joint data set
+
+A bar chart will be used to plot and display the active travel to work average per Scottish Council relative to population size in 2019. ggplot will be used for the purpose of plotting this display. The bars will vary in size to represent the population size. 
+
+
+```{r adjust the bars to represent the population in each council area, fig.width=27}
+joint_data %>% 
+   mutate(Relative_to_average=ifelse(active_average > Scottish_Average,"Above","Below")) %>% 
+  ggplot(aes(x = reorder(str_wrap(area_name, 10), active_average), 
+             y = active_average, 
+             fill = Relative_to_average, 
+             width = scales::rescale(population))) +
+  geom_col(position = position_dodge2(padding = 0.01), stat = "identity") +
+  geom_text(aes(label = population), position = position_dodge2(padding = 0.3), vjust = -0.7) +
+  scale_fill_viridis(discrete = TRUE, direction = -1)+
+  theme(legend.position = "none")+
+  xlab(NULL) +
+  ylab("Council area active travel to work average") + 
+  ggtitle("Active travel to work average by Scottish council area, relative to council population")+
+ theme(axis.text.x = element_text(size = 8),  
+        axis.text.y = element_text(size = 12),  
+        axis.title = element_text(size = 18),   
+        plot.title = element_text(size = 20))
+
+```
+ 
+
+
